@@ -321,7 +321,7 @@ body{background-image:radial-gradient(ellipse 70% 60% at 0% 0%, var(--wash1), tr
         </div>
         <div id="a4opts" style="display:flex;flex-direction:column;gap:10px">
           <div class="two">
-            <div class="f"><label>卡紙放進印表機後,靠哪一邊?</label>
+            <div class="f"><label>卡片會印在 A4 紙的哪一側?</label>
               <div class="seg" id="hSeg" role="group" aria-label="卡紙靠哪一邊">
                 <button type="button" data-h="left">靠左</button><button type="button" data-h="center">置中</button><button type="button" data-h="right">靠右</button>
               </div></div>
@@ -330,7 +330,7 @@ body{background-image:radial-gradient(ellipse 70% 60% at 0% 0%, var(--wash1), tr
           </div>
           <div class="a4row">
             <div class="a4pic" id="a4pic" aria-hidden="true"><i id="a4card"></i></div>
-            <p class="note">左邊的小圖是 A4 紙,綠色方塊是這張卡片會印的位置。每台印表機放紙的方式不同,有的靠左、有的靠右、有的置中。選的和你家印表機不一樣,字就會印歪。印一張校正頁就能確認。</p>
+            <p class="note">左邊的小圖是 A4 紙,綠色方塊是這張卡片會印的位置。<b>這裡的左右,指的是印出來的紙面,不是紙匣的左右。</b>例如 Epson 家用噴墨機把卡紙靠右放進後方紙匣,因為紙是上緣先進去,印出來的位置會在 A4 的<b>左側</b>。不確定的話,按下面「找出卡紙的位置」,印在卡紙上看數字最準。</p>
           </div>
           <div class="f"><button type="button" class="btn" id="bPosTest">找出卡紙的位置(印在一張真的卡紙上)</button>
             <p class="note" id="posHint"></p></div>
@@ -694,14 +694,15 @@ var templates = BUILTIN.map(function(t){ var c=clone(t); c.builtin=true; return 
 var cards = [];
 var cur = null, selId = null, hist = [], view = 'read', showSafe = true, K = 1, tab = 'tpl', drag = null, ht = null, editing = null;
 var settings = (function(){
-  /* Default for an Epson home inkjet: its rear tray holds the paper against the right edge, and the card's top edge goes in first. */
-  var d={dx:0,dy:0,flip:false,safe:5,paper:'a4',hpos:'right',vpos:'top',outline:false,v:3};
+  /* Default for an Epson home inkjet. Its rear tray holds the paper against the right-hand guide, but the sheet goes in top edge first,
+     so seen from the printed face the page's left edge is on the tray's right. The card therefore lands at the page's left, top. */
+  var d={dx:0,dy:0,flip:false,safe:5,paper:'a4',hpos:'left',vpos:'top',outline:false,v:4};
   try{
     var s=JSON.parse(localStorage.getItem('fc:print')||'null');
     if(s) for(var k in d) if(s[k]!=null) d[k]=s[k];
-    if(s && s.v!==3){ d.hpos='right'; d.vpos='top'; d.paper='a4'; }   /* earlier A4 versions assumed a centred or left-hand feed */
+    if(s && s.v!==4){ d.hpos='left'; d.vpos='top'; d.paper='a4'; }   /* earlier A4 versions guessed a centred or right-hand position */
   }catch(e){}
-  d.v=3;
+  d.v=4;
   return d;
 })();
 function saveSettings(){ try{ localStorage.setItem('fc:print', JSON.stringify(settings)); }catch(e){} }
