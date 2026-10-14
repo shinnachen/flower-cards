@@ -119,6 +119,9 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
 .posbox,.listbox{border-top:1px solid var(--line);padding-top:8px}
 .posbox summary,.listbox summary{cursor:pointer;font-size:13px;color:var(--muted);padding:2px 0}
 #chips{display:flex;flex-direction:column;gap:10px}
+.a4row{display:flex;gap:12px;align-items:flex-start}
+.a4pic{flex:none;position:relative;width:78px;aspect-ratio:210/297;border:1px solid var(--muted);background:#fff;border-radius:2px}
+.a4pic i{position:absolute;box-sizing:border-box;background:var(--accent-soft);border:1.5px solid var(--accent)}
 .toolbar{max-width:1500px;margin:0 auto 16px}
 .brand .sub{color:var(--muted);font-size:14px;letter-spacing:.12em;align-self:flex-end;padding-bottom:3px}
 /* Floral background: soft mint and blush washes, plus two flowering sprigs in opposite corners. Behind everything, never printed. */
@@ -306,9 +309,9 @@ body{background-image:radial-gradient(ellipse 70% 60% at 0% 0%, var(--wash1), tr
           <li>編輯好之後按「列印」,列印視窗會跳出來。</li>
           <li><b>目的地</b>選你的印表機,不要選「另存為 PDF」。</li>
           <li><b>紙張大小</b>保持 <b>A4</b>,<b>邊界</b>選「無」。</li>
-          <li>把卡紙放在紙匣的正中間,導紙片夾好,按列印。</li>
+          <li>把卡紙放進紙匣,導紙片夾緊,按列印。</li>
         </ol>
-        <p class="note">卡片會印在 A4 的正中間,所以不需要在印表機新增任何自訂紙張。卡紙放在紙匣中間,位置就會對上。第一次請先印「校正頁」確認位置。</p>
+        <p class="note">卡片會印在 A4 紙的某個位置,所以不需要在印表機新增任何自訂紙張。要告訴網頁你家印表機是把卡紙放在哪一邊(下面「紙張方式」),第一次請先印「校正頁」確認位置。</p>
         <hr>
         <div class="f"><label>紙張方式</label>
           <div class="seg" id="paperSeg" role="group" aria-label="紙張方式">
@@ -318,12 +321,19 @@ body{background-image:radial-gradient(ellipse 70% 60% at 0% 0%, var(--wash1), tr
         </div>
         <div id="a4opts" style="display:flex;flex-direction:column;gap:10px">
           <div class="two">
-            <div class="f"><label for="pH">卡片在 A4 的左右位置</label>
-              <select id="pH"><option value="center">置中</option><option value="left">靠左</option><option value="right">靠右</option></select></div>
-            <div class="f"><label for="pV">卡片在 A4 的上下位置</label>
-              <select id="pV"><option value="center">置中</option><option value="top">靠上</option><option value="bottom">靠下</option></select></div>
+            <div class="f"><label>卡紙放進印表機後,靠哪一邊?</label>
+              <div class="seg" id="hSeg" role="group" aria-label="卡紙靠哪一邊">
+                <button type="button" data-h="left">靠左</button><button type="button" data-h="center">置中</button><button type="button" data-h="right">靠右</button>
+              </div></div>
+            <div class="f"><label for="pV">卡紙從哪一端先進去?</label>
+              <select id="pV"><option value="top">靠上(一般都是)</option><option value="center">置中</option><option value="bottom">靠下</option></select></div>
           </div>
-          <p class="note">大部分印表機會把紙放在紙匣正中間,選「置中」就好。如果你的印表機是把紙靠一邊放,就選靠左或靠右。</p>
+          <div class="a4row">
+            <div class="a4pic" id="a4pic" aria-hidden="true"><i id="a4card"></i></div>
+            <p class="note">左邊的小圖是 A4 紙,綠色方塊是這張卡片會印的位置。每台印表機放紙的方式不同,有的靠左、有的靠右、有的置中。選的和你家印表機不一樣,字就會印歪。印一張校正頁就能確認。</p>
+          </div>
+          <div class="f"><button type="button" class="btn" id="bPosTest">找出卡紙的位置(印在一張真的卡紙上)</button>
+            <p class="note" id="posHint"></p></div>
           <div class="tg"><label><input type="checkbox" id="pOutline">印出卡片外框(只在測試時使用)</label></div>
         </div>
         <p class="note" id="cardopts" hidden>這個方式要先在印表機新增一個和卡片一樣大的自訂紙張(例如 190 × 257 公釐),列印視窗的「紙張大小」要選那個尺寸。設定比較麻煩,一般不建議。</p>
@@ -684,8 +694,14 @@ var templates = BUILTIN.map(function(t){ var c=clone(t); c.builtin=true; return 
 var cards = [];
 var cur = null, selId = null, hist = [], view = 'read', showSafe = true, K = 1, tab = 'tpl', drag = null, ht = null, editing = null;
 var settings = (function(){
-  var d={dx:0,dy:0,flip:false,safe:5,paper:'a4',hpos:'center',vpos:'center',outline:false};
-  try{ var s=JSON.parse(localStorage.getItem('fc:print')||'null'); if(s) for(var k in d) if(s[k]!=null) d[k]=s[k]; }catch(e){}
+  /* Default for an Epson home inkjet: its rear tray holds the paper against the right edge, and the card's top edge goes in first. */
+  var d={dx:0,dy:0,flip:false,safe:5,paper:'a4',hpos:'right',vpos:'top',outline:false,v:3};
+  try{
+    var s=JSON.parse(localStorage.getItem('fc:print')||'null');
+    if(s) for(var k in d) if(s[k]!=null) d[k]=s[k];
+    if(s && s.v!==3){ d.hpos='right'; d.vpos='top'; d.paper='a4'; }   /* earlier A4 versions assumed a centred or left-hand feed */
+  }catch(e){}
+  d.v=3;
   return d;
 })();
 function saveSettings(){ try{ localStorage.setItem('fc:print', JSON.stringify(settings)); }catch(e){} }
@@ -801,6 +817,7 @@ function afterOpen(){
   renderRows(); renderCanvas(); syncStyle(); renderTplList(); renderCardList(); updateDirty(); updateTplButtons(); updateCap();
 }
 function updateCap(){
+  if(typeof updatePic==='function') updatePic();
   var cv=canvasOf(cur);
   $('#cap').textContent = cur.mode==='rotate'
     ? '卡紙 '+cur.w+' × '+cur.h+' mm(直放)。編輯時是橫著讀的 '+cv.cw+' × '+cv.ch+' mm,列印時自動轉 90° 放上去。'
@@ -1210,6 +1227,14 @@ function testMarkup(w, h){
     '<text x="'+(w/2)+'" y="'+(h/2+22)+'" text-anchor="middle" font-size="3.6" '+ff+'>虛線是卡片邊緣,內框距離邊緣應為 10 mm</text>'+
     '<text x="'+(w/2)+'" y="'+(h/2+28)+'" text-anchor="middle" font-size="3.6" '+ff+'>量到的和 10 的差,就是要微調的數字</text></svg></div></div></div>';
 }
+/* A4 sheet covered in numbered 10 mm lines. Printed on a real card, the numbers that show up tell where the card sits in the printer. */
+function posTestMarkup(){
+  var s = '', k, tx = function(x, y, t){ return '<text x="'+x+'" y="'+y+'" font-size="3.4" font-family="Microsoft JhengHei,sans-serif" fill="#000" stroke="#fff" stroke-width=".9" paint-order="stroke">'+t+'</text>'; };
+  for(k=0;k<=210;k+=10) s += '<line x1="'+k+'" y1="0" x2="'+k+'" y2="297" stroke="#000" stroke-width="'+(k%50===0?.35:.15)+'"/>'+tx(k+.8,100,k)+tx(k+.8,200,k);
+  for(k=0;k<=297;k+=10) s += '<line x1="0" y1="'+k+'" x2="210" y2="'+k+'" stroke="#000" stroke-width="'+(k%50===0?.35:.15)+'"/>'+tx(100,k-.8,k);
+  s += tx(60,150,'位置測試頁:看卡紙上最左邊、最上面的數字');
+  return '<div class="sheet"><svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297" style="display:block">'+s+'</svg></div>';
+}
 function printNow(card, markup, raw){
   var root = $('#printRoot');
   root.innerHTML = '<style>'+sheetCss(card, raw)+'</style>'+markup;
@@ -1269,6 +1294,7 @@ $('#bDownload').addEventListener('click', function(){
   printNow(c, sheetMarkup(c), false);
 });
 $('#bTest').addEventListener('click', function(){ printNow({w:cur.w, h:cur.h, mode:'upright', elements:[]}, testMarkup(cur.w, cur.h), true); });
+$('#bPosTest').addEventListener('click', function(){ printNow({w:210, h:297, mode:'upright', elements:[]}, posTestMarkup(), true); });
 $('#bExport').addEventListener('click', function(){
   var data = {app:'flower-cards', version:1, templates:store.readLocal('templates'), cards:store.readLocal('cards')};
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:'application/json'}));
@@ -1296,11 +1322,26 @@ function syncPaperUI(){
   var a4 = settings.paper!=='card';
   $$('#paperSeg button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.paper===(a4?'a4':'card')); });
   $('#a4opts').style.display = a4 ? 'flex' : 'none'; $('#cardopts').hidden = a4;
-  $('#pH').value = settings.hpos; $('#pV').value = settings.vpos; $('#pOutline').checked = !!settings.outline;
+  $$('#hSeg button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.h===settings.hpos); });
+  $('#pV').value = settings.vpos; $('#pOutline').checked = !!settings.outline;
+  updatePic();
+}
+/* Small A4 diagram: where the current card will land on the sheet. */
+function updatePic(){
+  var el = $('#a4card'); if(!el || !cur) return;
+  var p = paperOf({w:cur.w, h:cur.h});
+  el.style.left = (p.ox/p.w*100)+'%'; el.style.top = (p.oy/p.h*100)+'%';
+  el.style.width = (cur.w/p.w*100)+'%'; el.style.height = (cur.h/p.h*100)+'%';
+  var hint = $('#posHint'); if(!hint) return;
+  var gw = r1(210-cur.w), gh = r1(297-cur.h);
+  hint.textContent = (gw<=0 && gh<=0)
+    ? '這張卡片和 A4 一樣大,不需要設定位置。'
+    : '印好後,看卡紙上最左邊的直線數字:'+(gw>0?'0 → 靠左;'+r1(gw/2)+' → 置中;'+gw+' → 靠右。':'都是 0。')+
+      '最上面的橫線數字:'+(gh>0?'0 → 靠上;'+r1(gh/2)+' → 置中;'+gh+' → 靠下。':'都是 0。');
 }
 $('#paperSeg').addEventListener('click', function(ev){ var b = ev.target.closest('[data-paper]'); if(b){ settings.paper = b.dataset.paper; saveSettings(); syncPaperUI(); } });
-$('#pH').addEventListener('change', function(){ settings.hpos = this.value; saveSettings(); });
-$('#pV').addEventListener('change', function(){ settings.vpos = this.value; saveSettings(); });
+$('#hSeg').addEventListener('click', function(ev){ var b = ev.target.closest('[data-h]'); if(b){ settings.hpos = b.dataset.h; saveSettings(); syncPaperUI(); } });
+$('#pV').addEventListener('change', function(){ settings.vpos = this.value; saveSettings(); syncPaperUI(); });
 $('#pOutline').addEventListener('change', function(){ settings.outline = this.checked; saveSettings(); });
 
 var armT = {};
